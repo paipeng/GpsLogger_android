@@ -1,4 +1,8 @@
 <resources>
-    <string name="app_name">GpsLogger</string>
-    <string name="title_activity_maps">Map</string>
+    <string name="app_name">GeoPaiSpot</string>
+    <string name="title_activity_maps">GeoPaiSpot</string>
+    <string name="dialog_title">Exit the app with </string>
+    <string name="dialog_text">Click YES to stop GPS service; Click NO to keep GSP service running</string>
+    <string name="dialog_button_yes">Yes</string>
+    <string name="dialog_button_no">No</string>
 </resources>

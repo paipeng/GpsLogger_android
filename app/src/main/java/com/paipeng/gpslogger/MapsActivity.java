@@ -1,13 +1,17 @@
 package com.paipeng.gpslogger;
 
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.LocalBroadcastManager;
+import android.content.ClipboardManager;
+import android.support.v7.app.AlertDialog;
 import android.util.Log;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -15,6 +19,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.paipeng.gpslogger.services.GPSService;
 
@@ -34,11 +39,50 @@ public class MapsActivity extends FragmentActivity {
 
 
     public ArrayList<LatLng> latLngArrayList;
+    private Marker spotMarker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
+
+        mMap = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map))
+                .getMap();
+
+        mMap.setMyLocationEnabled(true);
+        mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(LatLng latLng) {
+                Log.i(TAG, "onMapClick");
+
+                if (spotMarker != null) {
+                    spotMarker.remove();
+                }
+                MarkerOptions spotMarkerOptions = new MarkerOptions();
+                spotMarkerOptions.position(latLng).title(latLng.toString());
+                spotMarker = mMap.addMarker(spotMarkerOptions);
+            }
+        });
+
+        mMap.setOnInfoWindowClickListener(new GoogleMap.OnInfoWindowClickListener() {
+            @Override
+            public void onInfoWindowClick(Marker marker) {
+                String text = String.valueOf(marker.getPosition().latitude) + "," + String.valueOf(marker.getPosition().longitude);
+                Log.i(TAG, "text " + text);
+
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                ClipData clip = ClipData.newPlainText("gps", text);
+                clipboard.setPrimaryClip(clip);
+
+                Intent sendIntent = new Intent();
+                sendIntent.setAction(Intent.ACTION_SEND);
+                sendIntent.putExtra(Intent.EXTRA_TEXT, text);
+                sendIntent.setType("text/plain");
+                startActivity(sendIntent);
+            }
+        });
+
+
         setUpMapIfNeeded();
 
         latLngArrayList = new ArrayList<>();
@@ -97,19 +141,59 @@ public class MapsActivity extends FragmentActivity {
         super.onDestroy();
     }
 
+    @Override
+    public void onBackPressed() {
+        Log.d(TAG, "onBackPressed");
+        showDialog();
+    }
+
+    private void showDialog() {
+        AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(
+                this);
+
+        // set title
+        alertDialogBuilder.setTitle(R.string.dialog_title);
+
+        // set dialog message
+        alertDialogBuilder
+                .setMessage(R.string.dialog_text)
+                .setCancelable(true)
+                .setPositiveButton(R.string.dialog_button_yes,new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog,int id) {
+                        // if this button is clicked, close
+                        // current activity
+
+                        stopService(gpsServiceIntent);
+                        MapsActivity.this.finish();
+                    }
+                })
+                .setNegativeButton(R.string.dialog_button_no, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        // if this button is clicked, just close
+                        // the dialog box and do nothing
+                        dialog.cancel();
+                        MapsActivity.this.finish();
+                    }
+                });
+
+        // create alert dialog
+        AlertDialog alertDialog = alertDialogBuilder.create();
+
+        // show it
+        alertDialog.show();
+
+    }
+
     private void makeUseOfNewLocation(Location location) {
         Log.i(TAG, "makeUseOfNewLocation");
-        if (mMap == null) {
-            // Try to obtain the map from the SupportMapFragment.
-            mMap = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map))
-                    .getMap();
 
-        }
         // Check if we were successful in obtaining the map.
         if (mMap != null) {
             LatLng currentLatLng = new LatLng(location.getLatitude(), location.getLongitude());
             latLngArrayList.add(currentLatLng);
-            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 14.0f));
+            if (!mMap.getProjection().getVisibleRegion().latLngBounds.contains(currentLatLng)) {
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 7.0f));
+            }
             mMap.clear();
 
 
